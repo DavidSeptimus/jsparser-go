@@ -14,8 +14,11 @@ import (
 type Node = sitter.Node
 type Tree = sitter.Tree
 
+// prints any invocations of the property, propName, on the variable associated with the import of the module, moduleName,
+// in the source file at srcPath
 func main() {
 
+	// inputs
 	moduleName := "fs/promises"
 	propName := "readFile"
 	srcPath := "./resources/app.js"
@@ -119,21 +122,9 @@ func children(n *Node) []*Node {
 	return nodes
 }
 
-//sourceScanner provides methods for retrieving content from a source file's byte slice
-type sourceScanner struct {
-	Source *[]byte
-}
-
-//lines returns the source content as a slice of lines
-func (s sourceScanner) lines() []string {
-	return strings.Split(string(*s.Source), "\n")
-}
-
-//find returns the text representation of a Node
-func (s sourceScanner) find(n *Node) string {
-	return n.Content(*s.Source)
-}
-
+//findPropReferences returns a slice of type *Node containing all references to property propName
+// on variable varName
+// note: current implementation has an additional restriction such that it only returns invocations rather than accesses
 func findPropReferences(varName string, propName string, tree *Tree, scanner sourceScanner) []*Node {
 	props := findNode(
 		tree.RootNode(),
@@ -144,7 +135,7 @@ func findPropReferences(varName string, propName string, tree *Tree, scanner sou
 			func(n *Node) bool {
 				return scanner.find(n) == propName &&
 					predicates.NodeType("property_identifier")(n) &&
-					predicates.IsInvocation(n)
+					predicates.IsInvocation(n) // this is probably an over-optimization
 			},
 			predicates.NodeType("."),
 			func(n *Node) bool {
@@ -155,7 +146,6 @@ func findPropReferences(varName string, propName string, tree *Tree, scanner sou
 	)
 
 	return props
-
 }
 
 /*
@@ -176,4 +166,19 @@ func findNode(n *Node, predicate func(*Node) bool) []*Node {
 	}
 
 	return results
+}
+
+//sourceScanner provides methods for retrieving content from a source file's byte slice
+type sourceScanner struct {
+	Source *[]byte
+}
+
+//lines returns the source content as a slice of lines
+func (s sourceScanner) lines() []string {
+	return strings.Split(string(*s.Source), "\n")
+}
+
+//find returns the text representation of a Node
+func (s sourceScanner) find(n *Node) string {
+	return n.Content(*s.Source)
 }
