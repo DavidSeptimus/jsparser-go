@@ -43,3 +43,16 @@ func IsInvocation(n *Node) bool {
 	psibling := n.Parent().NextSibling()
 	return psibling != nil && psibling.Type() == "arguments"
 }
+
+//TextEquals returns a predicate that compares the supplied *Node's text representation
+// to the value of the supplied text argument using the supplied Scanner
+func TextEquals(text string, scanner Scanner) func(*Node) bool {
+	return func(n *Node) bool {
+		return text == scanner.Find(n)
+	}
+}
+
+//Scanner is an interface representing the ability to find a Node's text representation
+type Scanner interface {
+	Find(*Node) string
+}

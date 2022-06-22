@@ -41,7 +41,7 @@ func findInvocations(moduleName string, propName string, srcPath string) (mVar *
 	}
 
 	mVar = moduleAssignments[0] // just use the first assignment for now
-	varName := scanner.find(mVar)
+	varName := scanner.Find(mVar)
 	invocations = findPropReferences(varName, propName, tree, scanner)
 
 	// just print here to keep things simple
@@ -65,7 +65,7 @@ func findModuleAssignment(module string, tree *Tree, scanner sourceScanner) []*N
 			continue
 		}
 		callExp := callExps[0]
-		if scanner.find(callExp) == module {
+		if scanner.Find(callExp) == module {
 			identifierNode := findNode(node, predicates.NodeType("identifier"))[0]
 			results = append(results, identifierNode)
 		}
@@ -76,7 +76,7 @@ func findModuleAssignment(module string, tree *Tree, scanner sourceScanner) []*N
 //printNodes prints each node in the supplied slice along with the line number of its start point
 func printNodes(nodes []*Node, scanner sourceScanner) {
 	for _, n := range nodes {
-		fmt.Printf("line %d: %s\n", n.StartPoint().Row+1, scanner.find(n))
+		fmt.Printf("line %d: %s\n", n.StartPoint().Row+1, scanner.Find(n))
 	}
 }
 
@@ -128,29 +128,36 @@ func children(n *Node) []*Node {
 func findPropReferences(varName string, propName string, tree *Tree, scanner sourceScanner) []*Node {
 	props := findNode(
 		tree.RootNode(),
-		predicates.Chain(
-			func(n *Node) *Node {
-				return n.PrevSibling()
-			},
-			func(n *Node) bool {
-				return scanner.find(n) == propName &&
-					predicates.NodeType("property_identifier")(n) &&
-					predicates.IsInvocation(n) // this is probably an over-optimization
-			},
+		predicates.Chain(prevSibling,
+			predicates.Chain(identity,
+				predicates.TextEquals(propName, scanner),
+				predicates.NodeType("property_identifier"),
+				predicates.IsInvocation, // this is probably an over-optimization),
+			),
 			predicates.NodeType("."),
-			func(n *Node) bool {
-				return scanner.find(n) == varName &&
-					predicates.NodeType("identifier")(n)
-			},
+			predicates.Chain(identity,
+				predicates.TextEquals(varName, scanner),
+				predicates.NodeType("identifier"),
+			),
 		),
 	)
 
 	return props
 }
 
+//identity returns the supplied *Node
+func identity(n *Node) *Node {
+	return n
+}
+
+//prevSibling returns the supplied *Node's previous sibling
+func prevSibling(n *Node) *Node {
+	return n.PrevSibling()
+}
+
 /*
 findNode returns a slice of type *Node containing all Nodes that match the supplied predicate recursively;
-starting from the root node
+starting from the root node (DFS - preorder traversal)
 
 Note: might benefit from a negative predicate that actively excludes certain irrelevant branches
 */
@@ -178,7 +185,7 @@ func (s sourceScanner) lines() []string {
 	return strings.Split(string(*s.Source), "\n")
 }
 
-//find returns the text representation of a Node
-func (s sourceScanner) find(n *Node) string {
+//Find returns the text representation of a Node
+func (s sourceScanner) Find(n *Node) string {
 	return n.Content(*s.Source)
 }
